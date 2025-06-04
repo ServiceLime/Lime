@@ -1,63 +1,54 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # # SQL
-
-# In[ ]:
-
 
 from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 import pandas as pd
 import os
 
-# Параметры подключения
-host = os.getenv("DB_HOST")
-user = os.getenv("DB_USER")
-password = os.getenv("DB_PASSWORD")
-database = os.getenv("DB_NAME", "payments_yakassa")
+# # Параметры подключения
+# host = os.getenv("DB_HOST")
+# user = os.getenv("DB_USER")
+# password = os.getenv("DB_PASSWORD")
+# database = os.getenv("DB_NAME", "payments_yakassa")
 
-if not host or not user or not password:
-    raise RuntimeError("Database credentials must be provided via environment variables")
+# if not host or not user or not password:
+#     raise RuntimeError("Database credentials must be provided via environment variables")
 
-# Создание движка
-engine = create_engine(
-    f"mysql+mysqldb://{user}:%s@{host}/{database}" % quote_plus(password)
-)
+# # Создание движка
+# engine = create_engine(
+#     f"mysql+mysqldb://{user}:%s@{host}/{database}" % quote_plus(password)
+# )
 
-# SQL-запрос
-query = """
-SELECT id, order_id, price, status, created_date, pack_id, pack_identifier_id, user_id, email, device, device_name,
-       cancel_reason, is_refund, refund_amount, user_pack_id, platform_id, app_id, is_autopay, is_promo
-FROM payments_yakassa
-WHERE app_id IN (561, 582)
-"""
+# # SQL-запрос
+# query = """
+# SELECT id, order_id, price, status, created_date, pack_id, pack_identifier_id, user_id, email, device, device_name,
+#        cancel_reason, is_refund, refund_amount, user_pack_id, platform_id, app_id, is_autopay, is_promo
+# FROM payments_yakassa
+# WHERE app_id IN (561, 582)
+# """
 
-# Загрузка данных в DataFrame
-with engine.connect() as connection:
-    df = pd.read_sql(text(query), connection)
+# # Загрузка данных в DataFrame
+# with engine.connect() as connection:
+#     df = pd.read_sql(text(query), connection)
 
-print(f"Загружено {len(df)} строк")
+# print(f"Загружено {len(df)} строк")
 
 
 # # Недельный
-
-# In[11]:
-
 
 import pandas as pd
 from datetime import datetime, timedelta
 
 FILE_PATH = 'export_(ReportPayments.2025-02-14 - 2025-06-01.).csv'  # путь к CSV-файлу
 
-# === Загрузка данных ===
+# Загрузка данных
 with open(FILE_PATH, 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
 header_line = lines[10].strip().split(';')
 df = pd.read_csv(FILE_PATH, skiprows=11, sep=';', names=header_line)
 
-# === Подготовка ===
+# Подготовка
 df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
 df['дата'] = pd.to_datetime(df['дата'], errors='coerce')
 
@@ -66,7 +57,7 @@ df = df[
     (df['e-mail_оплаты'].notnull())
 ].sort_values(by=['e-mail_оплаты', 'id_пакета', 'дата'])
 
-# === Классификация переходов ===
+# Классификация переходов
 def classify_transactions(group):
     group = group.sort_values('дата')
     types = []
@@ -90,7 +81,7 @@ def classify_transactions(group):
 
 df = df.groupby(['e-mail_оплаты', 'id_пакета']).apply(classify_transactions).reset_index(drop=True)
 
-# === Только первая автопокупка после промо ===
+# Только первая автопокупка после промо
 df = df[df['тип_сделки'] == 'full']
 df['год'] = df['дата'].dt.isocalendar().year
 df['неделя'] = df['дата'].dt.isocalendar().week
@@ -98,7 +89,7 @@ df['неделя'] = df['дата'].dt.isocalendar().week
 # Пользователь с привязкой к пакету
 df['пользователь'] = df['e-mail_оплаты'] + ' — ' + df['девайс_оплаты']
 
-# === Группировка по неделе и пакету ===
+# Группировка по неделе и пакету
 grouped = (
     df.groupby(['год', 'неделя', 'пакет'])
     .agg(переходы=('пользователь', lambda x: sorted(set(x))))
@@ -116,10 +107,10 @@ grouped[['начало_недели', 'конец_недели']] = grouped.appl
     axis=1
 )
 
-# === Сортировка и вывод ===
+# Сортировка и вывод
 grouped = grouped.sort_values(by=['год', 'неделя'], ascending=False)
 
-# === Печать отчёта ===
+# Печать отчёта
 print("Переходы по неделям и пакетам:\n")
 total = 0
 for (_, row) in grouped.iterrows():
@@ -139,22 +130,19 @@ for _, row in grouped.iterrows():
 
 # # Месячный
 
-# In[12]:
-
-
 import pandas as pd
 from datetime import datetime
 
 FILE_PATH = 'export_(ReportPayments.2025-02-14 - 2025-06-01.).csv'
 
-# === Загрузка данных ===
+# Загрузка данных
 with open(FILE_PATH, 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
 header_line = lines[10].strip().split(';')
 df = pd.read_csv(FILE_PATH, skiprows=11, sep=';', names=header_line)
 
-# === Подготовка ===
+# Подготовка
 df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
 df['дата'] = pd.to_datetime(df['дата'], errors='coerce')
 
@@ -163,7 +151,7 @@ df = df[
     (df['e-mail_оплаты'].notnull())
 ].sort_values(by=['e-mail_оплаты', 'id_пакета', 'дата'])
 
-# === Классификация переходов ===
+# Классификация переходов
 def classify_transactions(group):
     group = group.sort_values('дата')
     types = []
@@ -187,14 +175,14 @@ def classify_transactions(group):
 
 df = df.groupby(['e-mail_оплаты', 'id_пакета']).apply(classify_transactions).reset_index(drop=True)
 
-# === Только первая автопокупка после промо ===
+# Только первая автопокупка после промо
 df = df[df['тип_сделки'] == 'full']
 df['год'] = df['дата'].dt.year
 df['месяц'] = df['дата'].dt.month
 df['месяц_текст'] = df['дата'].dt.strftime('%B')
 df['пользователь'] = df['e-mail_оплаты'] + ' — ' + df['девайс_оплаты']
 
-# === Группировка по месяцу и пакету ===
+# Группировка по месяцу и пакету
 grouped = (
     df.groupby(['год', 'месяц', 'месяц_текст', 'пакет'])
     .agg(
@@ -203,7 +191,7 @@ grouped = (
     .reset_index()
 )
 
-# === Сортировка и вывод ===
+# Сортировка и вывод
 grouped = grouped.sort_values(by=['год', 'месяц'], ascending=False)
 
 print("Переходы по месяцам и пакетам:\n")
@@ -215,7 +203,7 @@ for _, row in grouped.iterrows():
 
 print(f"\nВсего переходов: {total}\n")
 
-# === Детальный список ===
+# Детальный список
 for _, row in grouped.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['пакет']}:")
     for u in row['переходы']:
@@ -224,9 +212,6 @@ for _, row in grouped.iterrows():
 
 
 # # Табличка с соответствиями
-
-# In[26]:
-
 
 import pandas as pd
 from IPython.display import display
@@ -277,17 +262,14 @@ display(tracker_summary)
 
 # # Вывод конверсии
 
-# In[32]:
-
-
 import pandas as pd
 from datetime import datetime
 
-# === Пути к файлам ===
+# Пути к файлам
 PAYMENTS_PATH = 'export_(ReportPayments.2025-02-14 - 2025-06-01.).csv'
 INSTALLATIONS_PATH = 'installations.csv'
 
-# === Загрузка платежей ===
+# Загрузка платежей
 with open(PAYMENTS_PATH, 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
@@ -296,13 +278,13 @@ df = pd.read_csv(PAYMENTS_PATH, skiprows=11, sep=';', names=header_line)
 df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
 df['дата'] = pd.to_datetime(df['дата'], errors='coerce')
 
-# === Фильтрация успешных платежей ===
+# Фильтрация успешных платежей
 df = df[
     (df['статус'].str.lower() == 'успешно') &
     (df['e-mail_оплаты'].notnull())
 ].sort_values(by=['e-mail_оплаты', 'id_пакета', 'дата'])
 
-# === Классификация переходов ===
+# Классификация переходов
 def classify_transactions(group):
     group = group.sort_values('дата')
     types = []
@@ -326,32 +308,31 @@ def classify_transactions(group):
 
 df = df.groupby(['e-mail_оплаты', 'id_пакета']).apply(classify_transactions).reset_index(drop=True)
 
-# === Фильтрация только переходов full ===
+# Фильтрация только переходов full
 df = df[df['тип_сделки'] == 'full']
 
-# === Загрузка трекеров ===
+# Загрузка трекеров
 install_df = pd.read_csv(INSTALLATIONS_PATH)
 install_df = install_df.dropna(subset=['profile_id'])
 install_df = install_df.rename(columns={'profile_id': 'девайс_оплаты'})
 install_df = install_df.drop_duplicates(subset=['девайс_оплаты'])
 install_df['tracker_name'] = install_df['tracker_name'].fillna('unknown')
 
-# === Объединение с трекерами ===
+# Объединение с трекерами
 df = df.merge(install_df, on='девайс_оплаты', how='left')
 df['tracker_name'] = df['tracker_name'].fillna('unknown')
 
-# === Добавление года, месяца и форматированного месяца ===
+# Добавление года, месяца и форматированного месяца
 df['год'] = df['дата'].dt.year
 df['месяц'] = df['дата'].dt.month
 df['месяц_текст'] = df['дата'].dt.strftime('%B')
 
-# === Создание строки с пользователем и трекером ===
+# Создание строки с пользователем и трекером
 df['пользователь'] = df.apply(
     lambda row: f"{row['e-mail_оплаты']} — {row['девайс_оплаты']} — [{row['tracker_name']}] — {row['сумма']}₽", axis=1
 )
 
-
-# === Группировка по месяцам и пакетам ===
+# Группировка по месяцам и пакетам
 grouped = (
     df.groupby(['год', 'месяц', 'месяц_текст', 'пакет'])
     .agg(переходы=('пользователь', lambda x: sorted(set(x))))
@@ -359,7 +340,7 @@ grouped = (
     .sort_values(by=['год', 'месяц'], ascending=False)
 )
 
-# === Вывод переходов по месяцам и пакетам ===
+# Вывод переходов по месяцам и пакетам
 print("Переходы по месяцам и пакетам:\n")
 total = 0
 for _, row in grouped.iterrows():
@@ -368,14 +349,14 @@ for _, row in grouped.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['пакет']}: {count}")
 print(f"\nВсего переходов: {total}\n")
 
-# === Подробный список переходов с трекерами ===
+# Подробный список переходов с трекерами
 for _, row in grouped.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['пакет']}:")
     for u in row['переходы']:
         print(f"  {u}")
     print()
 
-# === Статистика по трекерам с разбивкой по месяцам ===
+# Статистика по трекерам с разбивкой по месяцам
 monthly_tracker_stats = (
     df.groupby(['год', 'месяц', 'месяц_текст', 'tracker_name'])
     .agg(
@@ -393,17 +374,14 @@ for _, row in monthly_tracker_stats.iterrows():
 
 # # Вывод повторных
 
-# In[34]:
-
-
 import pandas as pd
 import re
 
-# === Загрузка файлов ===
+# Загрузка файлов
 df = pd.read_csv("ReportPayments.csv", sep=';')
 installs_df = pd.read_csv("installations.csv")
 
-# === Полный список исключённых пользователей ===
+# Полный список исключённых пользователей
 excluded_block = """
 user1997710@limexltd.com — 1ff2e5f148e2d1a0
 user1999964@limexltd.com — cd2fa561deea22bb
@@ -492,33 +470,33 @@ user2196090@limexltd.com — dc128e8609a6c554
 
 excluded = set(re.findall(r'(\S+@limexltd\.com)\s+—\s+([0-9a-f]+)', excluded_block))
 
-# === Удаление исключённых пользователей ===
+# Удаление исключённых пользователей
 df_filtered = df[~df.apply(lambda row: (row['E-mail оплаты'], row['Девайс оплаты']) in excluded, axis=1)]
 
-# === Извлечение "старого" трекера (если не будет найден) ===
+# Извлечение "старого" трекера (если не будет найден)
 df_filtered['tracker'] = df_filtered['Приложение'].str.extract(r'\|\s*(.*)')
 
-# === Слияние с installations.csv по device_id ===
+# Слияние с installations.csv по device_id
 merged_df = df_filtered.merge(installs_df, left_on='Девайс оплаты', right_on='profile_id', how='left')
 
-# === Приоритетный трекер — из installations.csv ===
+# Приоритетный трекер — из installations.csv
 merged_df['tracker_final'] = merged_df['tracker_name'].combine_first(merged_df['tracker'])
 
-# === Формат результата ===
+# Формат результата
 merged_df['output'] = merged_df.apply(
     lambda row: f"{row['E-mail оплаты']} — {row['Девайс оплаты']} — [{row['tracker_final']}] — {row['Сумма']}₽",
     axis=1
 )
 
-# === Вывод в консоль ===
+# Вывод в консоль
 for line in merged_df['output']:
     print(line)
 
-# === Преобразуем дату в формат datetime и выделим месяц ===
+# Преобразуем дату в формат datetime и выделим месяц
 merged_df['Дата'] = pd.to_datetime(merged_df['Дата'], errors='coerce')
 merged_df['Месяц'] = merged_df['Дата'].dt.strftime('%B %Y')
 
-# === Группировка по Месяц и tracker_final ===
+# Группировка по Месяц и tracker_final
 stats = (
     merged_df.groupby(['Месяц', 'tracker_final'])
     .agg(пользователей=('E-mail оплаты', 'nunique'), сумма_руб=('Сумма', 'sum'))
@@ -526,23 +504,20 @@ stats = (
     .sort_values(['Месяц', 'tracker_final'])
 )
 
-# === Вывод статистики в консоль ===
+# Вывод статистики в консоль
 print("\nСтатистика по трекерам по месяцам:\n")
 for _, row in stats.iterrows():
     print(f"{row['Месяц']} — {row['tracker_final']}: {row['пользователей']} пользователей, {row['сумма_руб']}₽")
 
 
-# In[36]:
-
-
 import pandas as pd
 from datetime import datetime
 
-# === Пути к файлам ===
+# Пути к файлам
 PAYMENTS_PATH = 'export_(ReportPayments.2025-02-14 - 2025-06-01.).csv'
 INSTALLATIONS_PATH = 'installations.csv'
 
-# === Загрузка платежей ===
+# Загрузка платежей
 with open(PAYMENTS_PATH, 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
@@ -551,13 +526,13 @@ df = pd.read_csv(PAYMENTS_PATH, skiprows=11, sep=';', names=header_line)
 df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
 df['дата'] = pd.to_datetime(df['дата'], errors='coerce')
 
-# === Фильтрация успешных платежей ===
+# Фильтрация успешных платежей
 df = df[
     (df['статус'].str.lower() == 'успешно') &
     (df['e-mail_оплаты'].notnull())
 ].sort_values(by=['e-mail_оплаты', 'id_пакета', 'дата'])
 
-# === Классификация переходов ===
+# Классификация переходов
 def classify_transactions(group):
     group = group.sort_values('дата')
     types = []
@@ -583,38 +558,38 @@ def classify_transactions(group):
 
 df = df.groupby(['e-mail_оплаты', 'id_пакета']).apply(classify_transactions).reset_index(drop=True)
 
-# === Повторные платежи ===
+# Повторные платежи
 repeat_df = df[df['тип_сделки'] == 'repeat'].copy()
 
-# === Оставляем только full-переходы для переходной статистики ===
+# Оставляем только full-переходы для переходной статистики
 df = df[df['тип_сделки'] == 'full']
 
-# === Загрузка трекеров ===
+# Загрузка трекеров
 install_df = pd.read_csv(INSTALLATIONS_PATH)
 install_df = install_df.dropna(subset=['profile_id'])
 install_df = install_df.rename(columns={'profile_id': 'девайс_оплаты'})
 install_df = install_df.drop_duplicates(subset=['девайс_оплаты'])
 install_df['tracker_name'] = install_df['tracker_name'].fillna('unknown')
 
-# === Объединение с трекерами ===
+# Объединение с трекерами
 df = df.merge(install_df, on='девайс_оплаты', how='left')
 df['tracker_name'] = df['tracker_name'].fillna('unknown')
 
 repeat_df = repeat_df.merge(install_df, on='девайс_оплаты', how='left')
 repeat_df['tracker_name'] = repeat_df['tracker_name'].fillna('unknown')
 
-# === Добавление года, месяца и форматированного месяца ===
+# Добавление года, месяца и форматированного месяца
 for target_df in [df, repeat_df]:
     target_df['год'] = target_df['дата'].dt.year
     target_df['месяц'] = target_df['дата'].dt.month
     target_df['месяц_текст'] = target_df['дата'].dt.strftime('%B')
 
-# === Создание строки с пользователем и трекером ===
+# Создание строки с пользователем и трекером
 df['пользователь'] = df.apply(
     lambda row: f"{row['e-mail_оплаты']} — {row['девайс_оплаты']} — [{row['tracker_name']}] — {row['сумма']}₽", axis=1
 )
 
-# === Группировка по месяцам и пакетам (full only) ===
+# Группировка по месяцам и пакетам (full only)
 grouped = (
     df.groupby(['год', 'месяц', 'месяц_текст', 'пакет'])
     .agg(переходы=('пользователь', lambda x: sorted(set(x))))
@@ -622,7 +597,7 @@ grouped = (
     .sort_values(by=['год', 'месяц'], ascending=False)
 )
 
-# === Вывод переходов по месяцам и пакетам ===
+# Вывод переходов по месяцам и пакетам
 print("Переходы по месяцам и пакетам:\n")
 total = 0
 for _, row in grouped.iterrows():
@@ -631,14 +606,14 @@ for _, row in grouped.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['пакет']}: {count}")
 print(f"\nВсего переходов: {total}\n")
 
-# === Подробный список переходов с трекерами ===
+# Подробный список переходов с трекерами
 for _, row in grouped.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['пакет']}:")
     for u in row['переходы']:
         print(f"  {u}")
     print()
 
-# === Статистика по трекерам с разбивкой по месяцам (FULL) ===
+# Статистика по трекерам с разбивкой по месяцам (FULL)
 print("\nСтатистика по трекерам (переходы full) по месяцам:\n")
 monthly_tracker_stats = (
     df.groupby(['год', 'месяц', 'месяц_текст', 'tracker_name'])
@@ -653,7 +628,7 @@ monthly_tracker_stats = (
 for _, row in monthly_tracker_stats.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['tracker_name']}: {row['количество']} пользователей, {row['сумма']}₽")
 
-# === Статистика по повторным платежам (repeat) ===
+# Статистика по повторным платежам (repeat)
 print("\nСтатистика по повторным платежам (repeat) по месяцам и трекерам:\n")
 repeat_stats = (
     repeat_df.groupby(['год', 'месяц', 'месяц_текст', 'tracker_name'])
@@ -667,10 +642,3 @@ repeat_stats = (
 
 for _, row in repeat_stats.iterrows():
     print(f"{row['месяц_текст']} {row['год']} — {row['tracker_name']}: {row['количество']} повторных платежей, {row['сумма']}₽")
-
-
-# In[ ]:
-
-
-
-
