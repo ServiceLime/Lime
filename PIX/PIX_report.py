@@ -5,20 +5,20 @@ from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 
 # Настройки
-APP_ID = 4661140
-TOKEN = "y0__xDunbWlqveAAhianDcgvtvu8hI4Lgj1FE3Wx6z8be6gSyQ7sTrc4A"
-COUNTER_ID = "99133990"
-GOAL_ID_VOD = "353102040"
-GOAL_ID_SIMPLE = "353101995"
-SPREADSHEET_KEY = "1tE8lfckXvX536H2D64L4coqYRbZpl8eMhQQ2N6gAchw"
-GSHEET_TAB_NAME = "За день"
-CREDENTIALS_FILE = "limehd-451312-44fe1c22414e.json"
+app_id = 4661140
+token = "y0__xDunbWlqveAAhianDcgvtvu8hI4Lgj1FE3Wx6z8be6gSyQ7sTrc4A"
+counter_id = "99133990"
+id_vod = "353102040"
+id_simple = "353101995"
+gs_key = "1tE8lfckXvX536H2D64L4coqYRbZpl8eMhQQ2N6gAchw"
+gs_table_name = "За день"
+credentials = "limehd-451312-44fe1c22414e.json"
 
 def fetch_appmetrica(date: str):
     url = "https://api.appmetrica.yandex.ru/v2/user/acquisition"
-    headers = {"Authorization": f"OAuth {TOKEN}"}
+    headers = {"Authorization": f"OAuth {token}"}
     params = {
-        "id": APP_ID,
+        "id": app_id,
         "date1": date,
         "date2": date,
         "group": "Day",
@@ -46,15 +46,15 @@ def fetch_appmetrica(date: str):
 
 def fetch_metrika_combined(date: str):
     url = "https://api-metrika.yandex.net/stat/v1/data"
-    headers = {"Authorization": f"OAuth {TOKEN}"}
+    headers = {"Authorization": f"OAuth {token}"}
     metrics = ",".join([
         "ym:s:users",
         "ym:s:newUsers",
-        f"ym:s:goal{GOAL_ID_VOD}conversionRate",
-        f"ym:s:goal{GOAL_ID_SIMPLE}conversionRate"
+        f"ym:s:goal{id_vod}conversionRate",
+        f"ym:s:goal{id_simple}conversionRate"
     ])
     params = {
-        "ids": COUNTER_ID,
+        "ids": counter_id,
         "metrics": metrics,
         "dimensions": "ym:s:lastTrafficSource",
         "date1": date,
@@ -91,11 +91,11 @@ def fetch_metrika_combined(date: str):
 def update_google_sheet(date_str: str, app_organic, app_non_organic,
                         ym_organic, ym_non_organic, new_users,
                         vod_conv, simple_conv):
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=[
+    creds = Credentials.from_service_account_file(credentials, scopes=[
         "https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"
     ])
     client = gspread.authorize(creds)
-    sheet = client.open_by_key(SPREADSHEET_KEY).worksheet(GSHEET_TAB_NAME)
+    sheet = client.open_by_key(gs_key).worksheet(gs_table_name)
     header_row = sheet.row_values(1)
     try:
         col = header_row.index(date_str) + 1
