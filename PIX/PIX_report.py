@@ -1,10 +1,11 @@
-
 import requests
 import gspread
+import pandas as pd
 from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
+import pymysql
 
-# Настройки
+# === Настройки ===
 app_id = 4661140
 token = "y0__xDunbWlqveAAhianDcgvtvu8hI4Lgj1FE3Wx6z8be6gSyQ7sTrc4A"
 counter_id = "99133990"
@@ -13,6 +14,8 @@ id_simple = "353101995"
 gs_key = "1tE8lfckXvX536H2D64L4coqYRbZpl8eMhQQ2N6gAchw"
 gs_table_name = "За день"
 credentials = "limehd-451312-44fe1c22414e.json"
+
+# === Функции ===
 
 def fetch_appmetrica(date: str):
     url = "https://api.appmetrica.yandex.ru/v2/user/acquisition"
@@ -43,6 +46,7 @@ def fetch_appmetrica(date: str):
             organic += devices
 
     return round(organic), round(total - organic)
+
 
 def fetch_metrika_combined(date: str):
     url = "https://api-metrika.yandex.net/stat/v1/data"
@@ -80,13 +84,13 @@ def fetch_metrika_combined(date: str):
     ym_non_organic = round(total_users - organic_users)
     ym_organic = round(organic_users)
 
-    # Тоталы: [users, newUsers, goal_vod, goal_simple]
     totals = data.get("totals", [0, 0, 0, 0])
     new_users = round(totals[1])
     vod_conversion = round(totals[2], 2)
     simple_conversion = round(totals[3], 2)
 
     return ym_organic, ym_non_organic, new_users, vod_conversion, simple_conversion
+
 
 def update_google_sheet(date_str: str, app_organic, app_non_organic,
                         ym_organic, ym_non_organic, new_users,
@@ -123,7 +127,61 @@ def update_google_sheet(date_str: str, app_organic, app_non_organic,
 
     print(f"Обновлены строки 2–5, 15–16, 18–20 для {letter}")
 
+    return {
+        "Дата": date_str,
+        "Установки органика": app_organic,
+        "Установки неорганика": app_non_organic,
+        "Посетители органика": ym_organic,
+        "Посетители неорганика": ym_non_organic,
+        "Новые посетители": new_users,
+        "Старт просмотра VOD": vod_conv,
+        "Старт просмотра": simple_conv
+    }
 
+
+def insert_into_day(row):
+    conn = pymysql.connect(
+        host='172.19.95.127',
+        user='DataAnalyst',
+        password='64fjeObn./d,DP][xds',
+        database='pix',
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+
+    with conn.cursor() as cursor:
+        sql = """
+        INSERT INTO day (
+            date, app_organic, app_non_organic,
+            ym_organic, ym_non_organic, new_users,
+            vod_conversion, simple_conversion
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            app_organic = VALUES(app_organic),
+            app_non_organic = VALUES(app_non_organic),
+            ym_organic = VALUES(ym_organic),
+            ym_non_organic = VALUES(ym_non_organic),
+            new_users = VALUES(new_users),
+            vod_conversion = VALUES(vod_conversion),
+            simple_conversion = VALUES(simple_conversion)
+        """
+        cursor.execute(sql, (
+            row["Дата"],
+            row["Установки органика"],
+            row["Установки неорганика"],
+            row["Посетители органика"],
+            row["Посетители неорганика"],
+            row["Новые посетители"],
+            row["Старт просмотра VOD"],
+            row["Старт просмотра"]
+        ))
+
+    conn.commit()
+    conn.close()
+    print("Данные добавлены в таблицу day")
+
+
+#Основной блок
 date_obj = datetime.now() - timedelta(days=1)
 date_api = date_obj.strftime("%Y-%m-%d")
 date_gs = date_obj.strftime("%d.%m.%y")
@@ -131,4 +189,14 @@ date_gs = date_obj.strftime("%d.%m.%y")
 app_org, app_non_org = fetch_appmetrica(date_api)
 ym_org, ym_non_org, new_users, vod_conv, simple_conv = fetch_metrika_combined(date_api)
 
-update_google_sheet(date_gs, app_org, app_non_org, ym_org, ym_non_org, new_users, vod_conv, simple_conv)
+result_row = update_google_sheet(
+    date_gs, app_org, app_non_org,
+    ym_org, ym_non_org, new_users,
+    vod_conv, simple_conv
+)
+
+df_result = pd.DataFrame([result_row])
+print("\nДанные, выгруженные в таблицу:")
+print(df_result)
+
+insert_into_day(result_row)
